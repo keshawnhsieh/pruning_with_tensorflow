@@ -203,11 +203,11 @@ class FullyConnectedClassifier(BaseNetwork):
                                                  momentum=momentum)
         with tf.variable_scope('optimizer'):
 
-            # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
-            #                                        momentum=momentum,
-            #                                        name='optimizer')
-            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
-                                               name='adam_optimizer')
+            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
+                                                   momentum=momentum,
+                                                   name='optimizer')
+            # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
+            #                                    name='adam_optimizer')
 
             self.global_step = tf.Variable(0)
             train_op = optimizer.minimize(loss,
@@ -243,11 +243,11 @@ class FullyConnectedClassifier(BaseNetwork):
 
         with tf.variable_scope('optimizer'):
 
-            # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
-            #                                        momentum=momentum,
-            #                                        name='optimizer')
-            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
-                                               name='adam_optimizer')
+            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
+                                                   momentum=momentum,
+                                                   name='optimizer')
+            # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
+            #                                    name='adam_optimizer')
 
             self.global_step = tf.Variable(0)
             grads_and_vars = optimizer.compute_gradients(loss)
