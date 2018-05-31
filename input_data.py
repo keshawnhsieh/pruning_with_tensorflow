@@ -87,9 +87,9 @@ def read_data_sets(train_zip,
     file_list = zf.filelist[1:]
 
     # for debug
-    s = [x for x in range(1, 251)] + [x for x in range(12501, 12751)]
-    _list = [file_list[f] for f in s]
-    file_list = _list
+    # s = [x for x in range(1, 251)] + [x for x in range(12501, 12751)]
+    # _list = [file_list[f] for f in s]
+    # file_list = _list
 
     num_files = len(file_list)
     images = np.zeros((num_files, 224, 224, 3), dtype=np.float32)
