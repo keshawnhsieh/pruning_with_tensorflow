@@ -3,12 +3,14 @@ tf.set_random_seed(123)
 import numpy as np
 np.random.seed(123)
 
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/")
+# from tensorflow.examples.tutorials.mnist import input_data
+import input_data
+# mnist = input_data.read_data_sets("MNIST_data/")
+data_set = input_data.read_data_sets("train.zip")
 
-train_data_provider = mnist.train
-validation_data_provider = mnist.validation
-test_data_provider = mnist.test
+train_data_provider = data_set.train
+validation_data_provider = data_set.validation
+test_data_provider = data_set.test
 
 from networks import network_dense
 from configs import ConfigNetworkDense as config
