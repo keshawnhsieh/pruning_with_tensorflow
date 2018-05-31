@@ -1,12 +1,14 @@
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/")
+# from tensorflow.examples.tutorials.mnist import input_data
+import input_data
+# mnist = input_data.read_data_sets("MNIST_data/")
+data_set = input_data.read_data_sets("train.zip")
 
-train_data_provider = mnist.train
-validation_data_provider = mnist.validation
-test_data_provider = mnist.test
+train_data_provider = data_set.train
+validation_data_provider = data_set.validation
+test_data_provider = data_set.test
 
 from networks import network_dense
 from configs import ConfigNetworkDense as config_dense
@@ -42,10 +44,10 @@ weights, optimizer_weights = (classifier
                                         optimizer_matrices_tf]))
 
 # plot weights distribution before pruning
-weights = classifier.sess.run(weight_matrices_tf)
-plot_utils.plot_histogram(weights,
-                          'weights_distribution_before_pruning',
-                          include_zeros=False)
+# weights = classifier.sess.run(weight_matrices_tf)
+# plot_utils.plot_histogram(weights,
+#                           'weights_distribution_before_pruning',
+#                           include_zeros=False)
 
 # for each pair (weight matrix + optimizer matrix)
 # get a binary mask to get rid of small values. 
@@ -71,9 +73,9 @@ for (weight_matrix,
 
 # now, lets look on weights distribution (zero values are excluded)
 weights = classifier.sess.run(weight_matrices_tf)
-plot_utils.plot_histogram(weights,
-                          'weights_distribution_after_pruning',
-                          include_zeros=False)
+# plot_utils.plot_histogram(weights,
+#                           'weights_distribution_after_pruning',
+#                           include_zeros=False)
 
 accuracy, loss = classifier.evaluate(data_provider=test_data_provider,
                                      batch_size=config_pruned.batch_size)
@@ -89,8 +91,8 @@ classifier.fit(n_epochs=config_pruned.n_epochs,
                test_data_provider=test_data_provider)
 
 # plot weights distribution again to see the difference
-weights = classifier.sess.run(weight_matrices_tf)
-plot_utils.plot_histogram(weights,
-                          'weights_distribution_after_fine_tuning',
-                          include_zeros=False)
+# weights = classifier.sess.run(weight_matrices_tf)
+# plot_utils.plot_histogram(weights,
+#                           'weights_distribution_after_fine_tuning',
+#                           include_zeros=False)
 
