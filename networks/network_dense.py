@@ -2,9 +2,13 @@ from typing import Union
 
 import tensorflow as tf
 from tqdm import tqdm
+import numpy as np
+from datetime import datetime
 
 from networks.network_base import BaseNetwork
 from utils import tensorflow_utils
+
+import layers as L
 
 class FullyConnectedClassifier(BaseNetwork):
 
@@ -74,7 +78,8 @@ class FullyConnectedClassifier(BaseNetwork):
         # create input nodes of a graph
     
         self.inputs = tf.placeholder(dtype=tf.float32,
-                                     shape=(None, self.input_size),
+                                     # shape=(None, self.input_size),
+                                     shape=(None, 224, 224, 3),
                                      name='inputs')
     
         self.labels = tf.placeholder(dtype=tf.int64,
@@ -107,35 +112,58 @@ class FullyConnectedClassifier(BaseNetwork):
 
             # dynamically create a network
 
-            for i, layer_size in enumerate(layer_sizes):
-    
-                with tf.variable_scope('layer_{layer}'.format(layer=i+1)):
+            # block 1 -- outputs 112x112x64
+            net, w, b = L.conv(net, name="conv1_1", kh=3, kw=3, n_out=64)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv1_2", kh=3, kw=3, n_out=64)
+            self._add_w_b(w, b)
+            net = L.pool(net, name="pool1", kh=2, kw=2, dw=2, dh=2)
 
-                    name = 'weights'
-                    shape = (tensorflow_utils.get_second_dimension(net), layer_size)
-                    weights = tf.get_variable(name=name,
-                                              shape=shape,
-                                              initializer=weights_initializer)
+            # block 2 -- outputs 56x56x128
+            net, w, b = L.conv(net, name="conv2_1", kh=3, kw=3, n_out=128)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv2_2", kh=3, kw=3, n_out=128)
+            self._add_w_b(w, b)
+            net = L.pool(net, name="pool2", kh=2, kw=2, dh=2, dw=2)
 
-                    self.weight_matrices.append(weights)
-                    # L2 loss
-                    tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES,
-                                         tf.reduce_sum(weights ** 2))
-        
-                    name = 'bias'
-                    shape = [layer_size]
-                    bias = tf.get_variable(name=name,
-                                           shape=shape,
-                                           initializer=bias_initializer)
-                    self.biases.append(bias)
-    
-                    net = tf.matmul(net, weights) + bias
-    
-                    # no activation and dropout on the last layer
-                    if i < len(layer_sizes) - 1:
-                        net = activation_fn(net)
-                        net = tf.nn.dropout(net, keep_prob=keep_prob)
-    
+            # # block 3 -- outputs 28x28x256
+            net, w, b = L.conv(net, name="conv3_1", kh=3, kw=3, n_out=256)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv3_2", kh=3, kw=3, n_out=256)
+            self._add_w_b(w, b)
+            net = L.pool(net, name="pool3", kh=2, kw=2, dh=2, dw=2)
+
+            # block 4 -- outputs 14x14x512
+            net, w, b = L.conv(net, name="conv4_1", kh=3, kw=3, n_out=512)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv4_2", kh=3, kw=3, n_out=512)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv4_3", kh=3, kw=3, n_out=512)
+            self._add_w_b(w, b)
+            net = L.pool(net, name="pool4", kh=2, kw=2, dh=2, dw=2)
+
+            # block 5 -- outputs 7x7x512
+            net, w, b = L.conv(net, name="conv5_1", kh=3, kw=3, n_out=512)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv5_2", kh=3, kw=3, n_out=512)
+            self._add_w_b(w, b)
+            net, w, b = L.conv(net, name="conv5_3", kh=3, kw=3, n_out=512)
+            self._add_w_b(w, b)
+            net = L.pool(net, name="pool5", kh=2, kw=2, dw=2, dh=2)
+
+            # flatten
+            flattened_shape = np.prod([s.value for s in net.get_shape()[1:]])
+            net = tf.reshape(net, [-1, flattened_shape], name="flatten")
+
+            # fully connected
+            net, w, b = L.fully_connected(net, name="fc6", n_out=4096)
+            self._add_w_b(w, b)
+            net = tf.nn.dropout(net, keep_prob)
+            net, w, b = L.fully_connected(net, name="fc7", n_out=4096)
+            self._add_w_b(w, b)
+            net = tf.nn.dropout(net, keep_prob)
+            net, w, b = L.fully_connected(net, name="fc8_2", n_out=2, activation_fn=None)
+            self._add_w_b(w, b)
             return net
     
     def _create_loss(self,
@@ -155,6 +183,13 @@ class FullyConnectedClassifier(BaseNetwork):
     
             return l2_loss + classification_loss
 
+    def _add_w_b(self, w, b):
+        self.weight_matrices.append(w)
+        self.biases.append(b)
+        # L2 loss
+        tf.add_to_collection(tf.GraphKeys.REGULARIZATION_LOSSES,
+                             tf.reduce_sum(w ** 2))
+
     def _create_optimizer(self,
                           loss: tf.Tensor,
                           learning_rate: Union[tf.Tensor, float],
@@ -168,9 +203,12 @@ class FullyConnectedClassifier(BaseNetwork):
                                                  momentum=momentum)
         with tf.variable_scope('optimizer'):
 
-            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
-                                                   momentum=momentum,
-                                                   name='optimizer')
+            # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
+            #                                        momentum=momentum,
+            #                                        name='optimizer')
+            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
+                                               name='adam_optimizer')
+
             self.global_step = tf.Variable(0)
             train_op = optimizer.minimize(loss,
                                           global_step=self.global_step,
@@ -205,9 +243,12 @@ class FullyConnectedClassifier(BaseNetwork):
 
         with tf.variable_scope('optimizer'):
 
-            optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
-                                                   momentum=momentum,
-                                                   name='optimizer')
+            # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
+            #                                        momentum=momentum,
+            #                                        name='optimizer')
+            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate,
+                                               name='adam_optimizer')
+
             self.global_step = tf.Variable(0)
             grads_and_vars = optimizer.compute_gradients(loss)
             grads_and_vars_sparse = self._apply_prune_on_grads(grads_and_vars,
@@ -242,7 +283,7 @@ class FullyConnectedClassifier(BaseNetwork):
         n_iterations = train_data_provider.num_examples // batch_size
 
         for epoch in range(n_epochs):
-            print('Starting epoch {epoch}.\n'.format(epoch=epoch+1))
+            print('{time}: Starting epoch {epoch}.\n'.format(time=datetime.now(), epoch=epoch+1))
             for iteration in tqdm(range(n_iterations), ncols=75):
 
                 images, labels = train_data_provider.next_batch(batch_size)
@@ -253,6 +294,14 @@ class FullyConnectedClassifier(BaseNetwork):
                              self.keep_prob: 1 - self.dropout} 
 
                 self.sess.run(self.train_op, feed_dict=feed_dict)
+
+                # if iteration % 100 == 0:
+                #     loss_val, acc_val = self.sess.run([self.loss, self.accuracy], feed_dict=feed_dict)
+                #
+                #     print('{time}: Step {step} completed.'.format(time=datetime.now(), step=iteration))
+                #     print('Accuracy on train batch: {accuracy}, loss on train batch: {loss}'.format(
+                #         accuracy=acc_val, loss=loss_val
+                #     ))
     
             # evaluate metrics after every epoch
             train_accuracy, train_loss = self.evaluate(train_data_provider,
@@ -260,11 +309,13 @@ class FullyConnectedClassifier(BaseNetwork):
             validation_accuracy, validation_loss = self.evaluate(validation_data_provider,
                                                                  batch_size=batch_size)
 
-            print('\nEpoch {epoch} completed.'.format(epoch=epoch+1))
+            print('\n{time}: Epoch {epoch} completed.'.format(time=datetime.now(), epoch=epoch+1))
             print('Accuracy on train: {accuracy}, loss on train: {loss}'.format(
                                     accuracy=train_accuracy, loss=train_loss))
             print('Accuracy on validation: {accuracy}, loss on validation: {loss}'.format(
                                     accuracy=validation_accuracy, loss=validation_loss))
+
+            self.save_model(global_step=self.global_step)
 
         test_accuracy, test_loss = self.evaluate(test_data_provider,
                                                  batch_size=batch_size)
@@ -273,7 +324,7 @@ class FullyConnectedClassifier(BaseNetwork):
         print('Accuracy on test: {accuracy}, loss on test: {loss}'.format(
                                 accuracy=test_accuracy, loss=test_loss))
 
-        self.save_model(global_step=self.global_step)
+        # self.save_model(global_step=self.global_step)
 
     def evaluate(self, data_provider, batch_size: int):
 
