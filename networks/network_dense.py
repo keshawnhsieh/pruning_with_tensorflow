@@ -7,6 +7,7 @@ from datetime import datetime
 
 from networks.network_base import BaseNetwork
 from utils import tensorflow_utils
+from tensorflow.contrib.distributions import percentile
 
 import layers as L
 
@@ -218,7 +219,7 @@ class FullyConnectedClassifier(BaseNetwork):
 
     def _apply_prune_on_grads(self,
                               grads_and_vars: list,
-                              threshold: float):
+                              fraction: float):
 
         # we need to make gradients correspondent
         # to the pruned weights to be zero
@@ -227,6 +228,7 @@ class FullyConnectedClassifier(BaseNetwork):
 
         for grad, var in grads_and_vars:
             if 'weights' in var.name:
+                threshold = percentile(tf.abs(var), q=fraction)
                 small_weights = tf.greater(threshold, tf.abs(var))
                 mask = tf.cast(tf.logical_not(small_weights), tf.float32)
                 grad = grad * mask

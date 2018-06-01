@@ -18,7 +18,8 @@ def get_sparse_values_indices(weights):
 
 def mask_for_big_values(weights, pruning_threshold):
 
-    small_weights = np.abs(weights) < pruning_threshold
+    # small_weights = np.abs(weights) < pruning_threshold
+    small_weights = np.abs(weights) < np.percentile(np.abs(weights), q=pruning_threshold)
     return np.logical_not(small_weights)
 
 def calculate_number_of_sparse_parameters(sparse_layers):

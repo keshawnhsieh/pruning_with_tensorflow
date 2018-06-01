@@ -14,7 +14,7 @@ class ConfigNetworkDense:
     model_path = 'saved_models/network_dense'
 
     n_epochs = 20
-    batch_size = 24
+    batch_size = 32
 
     @staticmethod
     def learning_rate_schedule(epoch):
@@ -35,10 +35,10 @@ class ConfigNetworkDensePruned:
     weight_decay = 0.0000
     activation_fn = tf.nn.relu
     model_path = 'saved_models/network_dense_pruned'
-    pruning_threshold = 0.03
+    pruning_threshold = 50 # fraction of prunning strength [0 - 100]
 
     n_epochs = 20
-    batch_size = 24
+    batch_size = 32
 
     @staticmethod
     def learning_rate_schedule(epoch):
