@@ -28,6 +28,27 @@ def conv(input_tensor, name, kw, kh, n_out, dw=1, dh=1, activation_fn=tf.nn.relu
         activation = activation_fn(tf.nn.bias_add(conv, biases))
         return activation, weights, biases
 
+def sparse_conv(input_tensor, sparse_var, name, dw=1, dh=1, activation_fn=tf.nn.relu):
+    with tf.variable_scope(name):
+        indicies = tf.get_variable(name='indicies',
+                                   initializer=sparse_var.indices,
+                                   dtype=tf.int16)
+        values = tf.get_variable(name='values',
+                                 initializer=sparse_var.values,
+                                 dtype=tf.float32)
+        dense_shape = tf.get_variable(name='dense_shape',
+                                      initializer=sparse_var.dense_shape,
+                                      dtype=tf.int64)
+        weights = tf.sparse_to_dense(tf.cast(indicies, tf.int64),
+                                     dense_shape,
+                                     values)
+        bias = tf.get_variable(name='bias', initializer=sparse_var.bias)
+
+        conv = tf.nn.conv2d(input_tensor, weights, (1, dh, dw, 1), padding='SAME')
+        activation = activation_fn(tf.nn.bias_add(conv, bias))
+
+    return activation, weights, bias
+
 
 def fully_connected(input_tensor, name, n_out, activation_fn=tf.nn.relu):
     n_in = input_tensor.get_shape()[-1].value
@@ -49,6 +70,29 @@ def fully_connected(input_tensor, name, n_out, activation_fn=tf.nn.relu):
             return activation_fn(logits), weights, biases
         else:
             return logits, weights, biases
+
+def sparse_fully_connected(input_tensor, sparse_var, name, activation_fn=tf.nn.relu):
+    with tf.variable_scope(name):
+        indicies = tf.get_variable(name='indicies',
+                                   initializer=sparse_var.indices,
+                                   dtype=tf.int16)
+        values = tf.get_variable(name='values',
+                                 initializer=sparse_var.values,
+                                 dtype=tf.float32)
+        dense_shape = tf.get_variable(name='dense_shape',
+                                      initializer=sparse_var.dense_shape,
+                                      dtype=tf.int64)
+        weights = tf.sparse_to_dense(tf.cast(indicies, tf.int64),
+                                     dense_shape,
+                                     values)
+        bias = tf.get_variable(name='bias', initializer=sparse_var.bias)
+
+        logits = tf.nn.bias_add(tf.matmul(input_tensor, weights), bias)
+
+        if activation_fn:
+            return activation_fn(logits), weights, bias
+        else:
+            return logits, weights, bias
 
 
 def pool(input_tensor, name, kh, kw, dh, dw):
