@@ -3,10 +3,12 @@ import collections
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/")
+# from tensorflow.examples.tutorials.mnist import input_data
+import input_data
+# mnist = input_data.read_data_sets("MNIST_data/")
+data_set = input_data.read_data_sets("train.zip")
 
-test_data_provider = mnist.test
+test_data_provider = data_set.test
 
 from networks import network_dense
 from networks import network_sparse

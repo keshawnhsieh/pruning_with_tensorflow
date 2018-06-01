@@ -2,10 +2,13 @@ from typing import Union
 
 import tensorflow as tf
 from tqdm import tqdm
+import numpy as np
 
 from networks.network_dense import FullyConnectedClassifier
 from utils import tensorflow_utils
 from utils import pruning_utils
+
+import layers as L
 
 class FullyConnectedClassifierSparse(FullyConnectedClassifier):
 
@@ -56,7 +59,7 @@ class FullyConnectedClassifierSparse(FullyConnectedClassifier):
     def _create_placeholders(self):
     
         self.inputs = tf.placeholder(dtype=tf.float32,
-                                     shape=(None, self.input_size),
+                                     shape=(None, 224, 224, 3),
                                      name='inputs')
     
         self.labels = tf.placeholder(dtype=tf.int64,
@@ -81,41 +84,57 @@ class FullyConnectedClassifierSparse(FullyConnectedClassifier):
 
             bias_initializer = tf.constant_initializer(0.1)
 
-            for i, layer in enumerate(sparse_layers):
-    
-                with tf.variable_scope('layer_{layer}'.format(layer=i+1)):
+            # block 1 -- outputs 112x112x64
+            net, w, b = L.sparse_conv(net, sparse_layers[0], name="conv1_1")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[1], name="conv1_2")
+            self.weight_tensors.append(w)
+            net = L.pool(net, name="pool1", kh=2, kw=2, dw=2, dh=2)
 
-                    # create variables based on sparse values                    
-                    with tf.variable_scope('sparse'):
+            # block 2 -- outputs 56x56x128
+            net, w, b = L.sparse_conv(net, sparse_layers[2], name="conv2_1")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[3], name="conv2_2")
+            self.weight_tensors.append(w)
+            net = L.pool(net, name="pool2", kh=2, kw=2, dh=2, dw=2)
 
-                        indicies = tf.get_variable(name='indicies',
-                                                   initializer=layer.indices,
-                                                   dtype=tf.int16)
+            # # block 3 -- outputs 28x28x256
+            net, w, b = L.sparse_conv(net, sparse_layers[4], name="conv3_1")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[5], name="conv3_2")
+            self.weight_tensors.append(w)
+            net = L.pool(net, name="pool3", kh=2, kw=2, dh=2, dw=2)
 
-                        values = tf.get_variable(name='values',
-                                                 initializer=layer.values,
-                                                 dtype=tf.float32)
+            # block 4 -- outputs 14x14x512
+            net, w, b = L.sparse_conv(net, sparse_layers[6], name="conv4_1")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[7], name="conv4_2")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[8], name="conv4_3")
+            self.weight_tensors.append(w)
+            net = L.pool(net, name="pool4", kh=2, kw=2, dh=2, dw=2)
 
-                        dense_shape = tf.get_variable(name='dense_shape',
-                                                      initializer=layer.dense_shape,
-                                                      dtype=tf.int64)
+            # block 5 -- outputs 7x7x512
+            net, w, b = L.sparse_conv(net, sparse_layers[9], name="conv5_1")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[10], name="conv5_2")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_conv(net, sparse_layers[11], name="conv5_3")
+            self.weight_tensors.append(w)
+            net = L.pool(net, name="pool5", kh=2, kw=2, dw=2, dh=2)
 
-                    # create a weight tensor based on the created variables
-                    weights = tf.sparse_to_dense(tf.cast(indicies, tf.int64),
-                                                 dense_shape,
-                                                 values)
+            # flatten
+            flattened_shape = np.prod([s.value for s in net.get_shape()[1:]])
+            net = tf.reshape(net, [-1, flattened_shape], name="flatten")
 
-                    self.weight_tensors.append(weights)
-        
-                    name = 'bias'
-                    bias = tf.get_variable(name=name,
-                                           initializer=layer.bias)
-    
-                    net = tf.matmul(net, weights) + bias
-    
-                    if i < len(sparse_layers) - 1:
-                        net = activation_fn(net)
-    
+            # fully connected
+            net, w, b = L.sparse_fully_connected(net, sparse_layers[12], name="fc6")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_fully_connected(net, sparse_layers[13], name="fc7")
+            self.weight_tensors.append(w)
+            net, w, b = L.sparse_fully_connected(net, sparse_layers[14], name="fc8_2", activation_fn=None)
+            self.weight_tensors.append(w)
+
             return net
 
     def _create_loss(self,
